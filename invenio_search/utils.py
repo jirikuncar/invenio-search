@@ -20,6 +20,8 @@
 """Utility functions for search engine."""
 
 import functools
+import pkg_resources
+import warnings
 
 import six
 
@@ -28,7 +30,14 @@ from intbitset import intbitset
 from six import iteritems, string_types
 from werkzeug.utils import import_string
 
-from invenio_base.globals import cfg
+from invenio.base.globals import cfg
+
+try:
+    pkg_resources.get_distribution('invenio_collections')
+except pkg_resources.DistributionNotFound:
+    HAS_COLLECTIONS = False
+else:
+    HAS_COLLECTIONS = True
 
 
 def get_most_popular_field_values(recids, tags, exclude_values=None,
@@ -130,26 +139,16 @@ def get_most_popular_field_values(recids, tags, exclude_values=None,
 def get_permitted_restricted_collections(user_info,
                                          recreate_cache_if_needed=True):
     """Return a list of restricted collection with user is authorization."""
-    from invenio_access.engine import acc_authorize_action
-    from invenio_collections.cache import (
-        restricted_collection_cache,
-    )
+    warnings.warn('Import function "get_permitted_restricted_collections" '
+                  'from "invenio-collections" package instead.',
+                  DeprecationWarning)
 
-    if recreate_cache_if_needed:
-        restricted_collection_cache.recreate_cache_if_needed()
-    ret = []
+    if HAS_COLLECTIONS:
+        from invenio_collections.cache import \
+            get_permitted_restricted_collections as gprc
+        return gprc(user_info)
 
-    auths = acc_authorize_action(
-        user_info,
-        'viewrestrcoll',
-        batch_args=True,
-        collection=restricted_collection_cache.cache
-    )
-
-    for collection, auth in zip(restricted_collection_cache.cache, auths):
-        if auth[0] == 0:
-            ret.append(collection)
-    return ret
+    raise RuntimeError('"invenio-collections" package is not installed.')
 
 
 def g_memoise(method=None, key=None):
